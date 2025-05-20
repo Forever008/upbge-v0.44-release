@@ -42,7 +42,7 @@
 #include "RAS_DisplayArray.h"
 #include "RAS_MeshObject.h"
 #include "RAS_Polygon.h"
-
+#include "MT_MinMax.h"
 
 /// todo: fill all the empty CcdPhysicsController methods, hook them up to the btRigidBody class
 
@@ -1239,7 +1239,13 @@ void CcdPhysicsController::SetScaling(const MT_Vector3 &scale)
     if (m_object && m_object->getCollisionShape()) {
       m_object->activate(true);  // without this, sleeping objects scale wont be applied in bullet
                                  // if python changes the scale - Campbell.
-      m_object->getCollisionShape()->setLocalScaling(m_cci.m_scaling);
+      if (m_object->getCollisionShape()->getShapeType() == SPHERE_SHAPE_PROXYTYPE && m_shapeInfo) {
+        btSphereShape *sphereShape = static_cast<btSphereShape *>(m_object->getCollisionShape());
+        float maxScale = MT_max(MT_max(scale.x(), scale.y()), scale.z());
+        sphereShape->setUnscaledRadius(m_shapeInfo->m_radius * maxScale);
+      } else {
+        m_object->getCollisionShape()->setLocalScaling(m_cci.m_scaling);
+      }
 
       btRigidBody *body = GetRigidBody();
       if (body && m_cci.m_mass) {
