@@ -3381,7 +3381,8 @@ CcdCollData::~CcdCollData()
 
 unsigned int CcdCollData::GetNumContacts() const
 {
-  return m_manifoldPoint->getNumContacts();
+  return 1; // Forcefully return 1 as a temporary workaround.
+  // return m_manifoldPoint->getNumContacts(); // This may occasionally return 0, which can cause incorrect collision contact detection.
 }
 
 MT_Vector3 CcdCollData::GetLocalPointA(unsigned int index, bool first) const
