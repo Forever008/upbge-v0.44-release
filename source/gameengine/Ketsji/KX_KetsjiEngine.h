@@ -193,7 +193,7 @@ class KX_KetsjiEngine {
   double m_anim_framerate;
 
   bool m_doRender; /* whether or not the scene should be rendered after the logic frame */
-
+  bool m_doFullUpdate;
   /// Key used to exit the BGE
   short m_exitkey;
 
@@ -471,6 +471,14 @@ class KX_KetsjiEngine {
    * Get the current render flag value
    */
   bool GetRender();
+  /**
+   * Get the current full scene update flag value
+   */
+  void SetFullUpdate(bool Update);
+  /**
+   * Get the current full scene update flag value
+   */
+  bool GetFullUpdate();
 
   /// Allow debug bounding box debug.
   void SetShowBoundingBox(KX_DebugOption mode);

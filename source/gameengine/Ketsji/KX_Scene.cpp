@@ -721,38 +721,39 @@ void KX_Scene::RenderAfterCameraSetup(KX_Camera *cam,
   }
 
   engine->CountDepsgraphTime();
+  bool fullupdate = engine->GetFullUpdate();
+  if (fullupdate) {
+    if (m_collectionRemap) {
+      /* check 68589a31ebfb79165f99a979357d237e5413e904 for potential issue or improvement? */
+      /* If problem with ReplicateBlenderObject, see other occurences of BKE_collection_object_add_from*/
+      BKE_main_collection_sync_remap(bmain);
+      m_collectionRemap = false;
+    }
 
-  if (m_collectionRemap) {
-    /* check 68589a31ebfb79165f99a979357d237e5413e904 for potential issue or improvement? */
-    /* If problem with ReplicateBlenderObject, see other occurences of BKE_collection_object_add_from*/
-    BKE_main_collection_sync_remap(bmain);
-    m_collectionRemap = false;
+    /* Notify the depsgraph if object transform changed in the scene
+    * for next drawing loop. */
+    for (KX_GameObject *gameobj : GetObjectList()) {
+      /* Update compatibles blender physics simulations */
+      Object *ob = gameobj->GetBlenderObject();
+      TagBlenderPhysicsObject(scene, ob);
+      gameobj->TagForTransformUpdate(is_overlay_pass, is_last_render_pass);
+    }
+
+    /* Notify depsgraph for other changes */
+    TagForExtraIdsUpdate(bmain, cam);
+
+    if (is_last_render_pass) {
+      m_idsToUpdateInAllRenderPasses.clear();
+    }
+
+    /* We need the changes to be flushed before each draw loop! */
+    BKE_scene_graph_update_tagged(depsgraph, bmain);
+  } else {
+    /* Update evaluated object object_to_world according to SceneGraph. */
+    for (KX_GameObject *gameobj : GetObjectList()) {
+      gameobj->TagForTransformUpdateEvaluated();
+    }
   }
-
-  /* Notify the depsgraph if object transform changed in the scene
-   * for next drawing loop. */
-  for (KX_GameObject *gameobj : GetObjectList()) {
-    /* Update compatibles blender physics simulations */
-    Object *ob = gameobj->GetBlenderObject();
-    TagBlenderPhysicsObject(scene, ob);
-    gameobj->TagForTransformUpdate(is_overlay_pass, is_last_render_pass);
-  }
-
-  /* Notify depsgraph for other changes */
-  TagForExtraIdsUpdate(bmain, cam);
-
-  if (is_last_render_pass) {
-    m_idsToUpdateInAllRenderPasses.clear();
-  }
-
-  /* We need the changes to be flushed before each draw loop! */
-  BKE_scene_graph_update_tagged(depsgraph, bmain);
-
-  /* Update evaluated object object_to_world according to SceneGraph. */
-  for (KX_GameObject *gameobj : GetObjectList()) {
-    gameobj->TagForTransformUpdateEvaluated();
-  }
-
   engine->EndCountDepsgraphTime();
 
   rcti window;

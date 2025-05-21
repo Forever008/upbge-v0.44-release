@@ -369,6 +369,20 @@ static PyObject *gPyGetRender(PyObject *)
   return PyBool_FromLong(KX_GetActiveEngine()->GetRender());
 }
 
+static PyObject *gPySetFullUpdate(PyObject *, PyObject *args)
+{
+  int update;
+  if (!PyArg_ParseTuple(args, "i:setFullUpdate", &update))
+    return nullptr;
+  KX_GetActiveEngine()->SetFullUpdate(update);
+  Py_RETURN_NONE;
+}
+
+static PyObject *gPyGetFullUpdate(PyObject *)
+{
+  return PyBool_FromLong(KX_GetActiveEngine()->GetFullUpdate());
+}
+
 static PyObject *gPySetMaxLogicFrame(PyObject *, PyObject *args)
 {
   int frame;
@@ -853,6 +867,14 @@ static struct PyMethodDef game_methods[] = {
      (PyCFunction)gPyGetRender,
      METH_NOARGS,
      (const char *)"get the global render flag value"},
+    {"setFullUpdate",
+     (PyCFunction)gPySetFullUpdate,
+     METH_VARARGS,
+     (const char *)"Set the global full scene update flag"},
+    {"getFullUpdate",
+     (PyCFunction)gPyGetFullUpdate,
+     METH_NOARGS,
+     (const char *)"get the global full scene update flag value"},
     {"getUseExternalClock",
      (PyCFunction)gPyGetUseExternalClock,
      METH_NOARGS,

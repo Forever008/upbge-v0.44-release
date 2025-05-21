@@ -148,6 +148,7 @@ KX_KetsjiEngine::KX_KetsjiEngine(KX_ISystem *system,
       m_ticrate(DEFAULT_LOGIC_TIC_RATE),
       m_anim_framerate(25.0),
       m_doRender(true),
+      m_doFullUpdate(true),
       m_exitkey(130),
       m_exitcode(KX_ExitRequest::NO_REQUEST),
       m_exitstring(""),
@@ -1593,6 +1594,16 @@ void KX_KetsjiEngine::SetRender(bool render)
 bool KX_KetsjiEngine::GetRender()
 {
   return m_doRender;
+}
+
+void KX_KetsjiEngine::SetFullUpdate(bool Update)
+{
+  m_doFullUpdate = Update;
+}
+
+bool KX_KetsjiEngine::GetFullUpdate()
+{
+  return m_doFullUpdate;
 }
 
 void KX_KetsjiEngine::ProcessScheduledScenes(void)
