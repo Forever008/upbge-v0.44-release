@@ -100,6 +100,7 @@ KX_GameObject::KX_GameObject()
       m_objectColor(1.0f, 1.0f, 1.0f, 1.0f),
       m_bVisible(true),
       m_bOccluder(false),
+      m_bOverrideDepsgraph(false),
       m_pPhysicsController(nullptr),
       m_pSGNode(nullptr),
       m_pInstanceObjects(nullptr),
@@ -231,6 +232,7 @@ void KX_GameObject::SetBlenderObject(Object *obj)
     if (base) {  // base can be nullptr for objects in instanced collections
       m_visibleAtGameStart = (base->flag & BASE_HIDDEN) == 0;
     }
+    m_bOverrideDepsgraph = obj->transflag & OB_TRANSFLAG_OVERRIDE_DEPSGRAPH;
   }
 }
 
@@ -257,6 +259,12 @@ void KX_GameObject::ForceIgnoreParentTx()
 
 void KX_GameObject::TagForTransformUpdate(bool is_overlay_pass, bool is_last_render_pass)
 {
+  
+
+  if (m_bOverrideDepsgraph){
+    return; // Ignore all depsgraph updates and skip this object
+  }
+
   float object_to_world[4][4];
   NodeGetWorldTransform().getValue(&object_to_world[0][0]);
   bool staticObject = true;
@@ -335,12 +343,17 @@ void KX_GameObject::TagForTransformUpdate(bool is_overlay_pass, bool is_last_ren
 
 void KX_GameObject::TagForTransformUpdateEvaluated()
 {
+
+  if (m_bOverrideDepsgraph){ // Ignore all depsgraph updates and skip this object
+    return;
+  }
+
   float object_to_world[4][4];
   NodeGetWorldTransform().getValue(&object_to_world[0][0]);
 
   bContext *C = KX_GetActiveEngine()->GetContext();
   Depsgraph *depsgraph = CTX_data_depsgraph_on_load(C);
-
+  
   Object *ob_orig = GetBlenderObject();
 
   bool skip_transform = ob_orig->transflag & OB_TRANSFLAG_OVERRIDE_GAME_PRIORITY;
@@ -1325,6 +1338,11 @@ void KX_GameObject::SetOccluder(bool v, bool recursive)
     setOccluder_recursive(GetSGNode(), v);
 }
 
+void KX_GameObject::SetOverrideDepsgraph(bool v)
+{
+  m_bOverrideDepsgraph = v;
+}
+
 static void setDebug_recursive(KX_Scene *scene, SG_Node *node, bool debug)
 {
   const NodeList &children = node->GetSGChildren();
@@ -2201,6 +2219,7 @@ PyMethodDef KX_GameObject::Methods[] = {
     {"setParent", (PyCFunction)KX_GameObject::sPySetParent, METH_VARARGS | METH_KEYWORDS},
     {"setVisible", (PyCFunction)KX_GameObject::sPySetVisible, METH_VARARGS},
     {"setOcclusion", (PyCFunction)KX_GameObject::sPySetOcclusion, METH_VARARGS},
+    {"setOverrideDepsgraph", (PyCFunction)KX_GameObject::sPySetOverrideDepsgraph, METH_VARARGS},
     {"removeParent", (PyCFunction)KX_GameObject::sPyRemoveParent, METH_NOARGS},
 
     {"getPhysicsId", (PyCFunction)KX_GameObject::sPyGetPhysicsId, METH_NOARGS},
@@ -4210,6 +4229,17 @@ PyObject *KX_GameObject::PySetOcclusion(PyObject *args)
   }
 
   SetOccluder(occlusion ? true : false, recursive ? true : false);
+  Py_RETURN_NONE;
+}
+
+PyObject *KX_GameObject::PySetOverrideDepsgraph(PyObject *args)
+{
+  int override = 0;
+  if (!PyArg_ParseTuple(args, "i|i:setOverrideDepsgraph", &override)) {
+    return nullptr;
+  }
+
+  SetOverrideDepsgraph(override ? true : false);
   Py_RETURN_NONE;
 }
 

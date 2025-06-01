@@ -127,7 +127,7 @@ class KX_GameObject : public SCA_IObject {
   // culled = while rendering, depending on camera
   bool m_bVisible;
   bool m_bOccluder;
-
+  bool m_bOverrideDepsgraph;
   // Object activity culling settings converted from blender objects.
   ActivityCullingInfo m_activityCullingInfo;
 
@@ -694,6 +694,10 @@ class KX_GameObject : public SCA_IObject {
   void SetVisible(bool b, bool recursive);
 
   /**
+   * Set Override Depsgraph
+   */
+  void SetOverrideDepsgraph(bool v);
+  /**
    * Is this object an occluder?
    */
   inline bool GetOccluder(void)
@@ -803,6 +807,7 @@ class KX_GameObject : public SCA_IObject {
   EXP_PYMETHOD_NOARGS(KX_GameObject, GetVisible);
   EXP_PYMETHOD_VARARGS(KX_GameObject, SetVisible);
   EXP_PYMETHOD_VARARGS(KX_GameObject, SetOcclusion);
+  EXP_PYMETHOD_VARARGS(KX_GameObject, SetOverrideDepsgraph);
   EXP_PYMETHOD_NOARGS(KX_GameObject, GetState);
   EXP_PYMETHOD_O(KX_GameObject, SetState);
   EXP_PYMETHOD(KX_GameObject, AlignAxisToVect);
