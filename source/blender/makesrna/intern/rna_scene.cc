@@ -6574,6 +6574,11 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Show Debug Properties", "Show properties marked for debugging while the game runs");
 
+  prop = RNA_def_property(srna, "depsgraph_debug", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_DEPSGRAPH_DEBUG);
+  RNA_def_property_ui_text(
+      prop, "Depsgraph Debug", "Enable depsgraph debug mode");
+
   prop = RNA_def_property(srna, "show_framerate_profile", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GAME_SHOW_FRAMERATE);
   RNA_def_property_ui_text(prop,

@@ -116,6 +116,7 @@ class RENDER_PT_game_debug(RenderButtonsPanel, Panel):
 
         flow = layout.column_flow()
         flow.prop(gs, "show_debug_properties", text="Debug Properties")
+        flow.prop(gs, "depsgraph_debug", text="Depsgraph Debug")
         flow.prop(gs, "show_framerate_profile", text="Framerate and Profile")
         flow.prop(gs, "show_physics_visualization", text="Physics Visualization")
         flow.prop(gs, "use_deprecation_warnings")

@@ -47,6 +47,10 @@
 #include "BLI_math_matrix.h"
 #include "BLI_task.h"
 #include "DEG_depsgraph_query.hh"
+#include "intern/depsgraph.hh"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_component.hh"
 #include "DNA_camera_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_mesh_types.h"
@@ -95,7 +99,7 @@
 #include "SCA_MouseManager.h"
 #include "SCA_TimeEventManager.h"
 #include "SG_Controller.h"
-
+#include <iostream>
 #ifdef WITH_PYTHON
 #  include "EXP_PythonCallBack.h"
 #  include "bpy_rna.hh"
@@ -721,6 +725,27 @@ void KX_Scene::RenderAfterCameraSetup(KX_Camera *cam,
   }
 
   engine->CountDepsgraphTime();
+  bool depsgraph_debug = (scene->gm.flag & GAME_DEPSGRAPH_DEBUG) != 0;
+  if (depsgraph_debug) {
+    namespace deg = blender::deg;
+    deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
+    for (deg::IDNode *id_node : deg_graph->id_nodes) {
+      if (id_node && id_node->id_orig) {
+        std::cout << "  ID: " << id_node->id_orig->name + 2
+                  << " (Type: " << id_node->id_orig->name[0] << id_node->id_orig->name[1]
+                  << ", Components: " << id_node->components.size()
+                  << ", User Modified: " << (id_node->is_user_modified ? "Yes" : "No") << ")" << std::endl;
+        
+        for (deg::ComponentNode *comp_node : id_node->components.values()) {
+          if (comp_node) {
+            std::cout << "    Component: " << deg::nodeTypeAsString(comp_node->type)
+                      << " (Operations: " << comp_node->operations.size() << ")" << std::endl;
+          }
+        }
+      }
+    }
+  }
+
   bool fullupdate = engine->GetFullUpdate();
   if (fullupdate) {
     if (m_collectionRemap) {
