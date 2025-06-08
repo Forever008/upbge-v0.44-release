@@ -1238,14 +1238,7 @@ void CcdPhysicsController::SetScaling(const MT_Vector3 &scale)
 
     if (m_object && m_object->getCollisionShape()) {
       m_object->activate(true);  // without this, sleeping objects scale wont be applied in bullet
-                                 // if python changes the scale - Campbell.
-      if (m_object->getCollisionShape()->getShapeType() == SPHERE_SHAPE_PROXYTYPE && m_shapeInfo) {
-        btSphereShape *sphereShape = static_cast<btSphereShape *>(m_object->getCollisionShape());
-        float maxScale = MT_max(MT_max(scale.x(), scale.y()), scale.z());
-        sphereShape->setUnscaledRadius(m_shapeInfo->m_radius * maxScale);
-      } else {
-        m_object->getCollisionShape()->setLocalScaling(m_cci.m_scaling);
-      }
+      m_object->getCollisionShape()->setLocalScaling(m_cci.m_scaling);
 
       btRigidBody *body = GetRigidBody();
       if (body && m_cci.m_mass) {
