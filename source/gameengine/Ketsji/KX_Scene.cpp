@@ -34,6 +34,9 @@
 #  pragma warning(disable : 4786)
 #endif
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include "KX_Scene.h"
 
 #include "BKE_duplilist.hh"
@@ -726,9 +729,10 @@ void KX_Scene::RenderAfterCameraSetup(KX_Camera *cam,
 
   engine->CountDepsgraphTime();
   bool depsgraph_debug = (scene->gm.flag & GAME_DEPSGRAPH_DEBUG) != 0;
+
+  namespace deg = blender::deg;
+  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
   if (depsgraph_debug) {
-    namespace deg = blender::deg;
-    deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
     for (deg::IDNode *id_node : deg_graph->id_nodes) {
       if (id_node && id_node->id_orig) {
         std::cout << "  ID: " << id_node->id_orig->name + 2
@@ -746,8 +750,100 @@ void KX_Scene::RenderAfterCameraSetup(KX_Camera *cam,
     }
   }
 
-  bool fullupdate = engine->GetFullUpdate();
-  if (fullupdate) {
+bool fullupdate = engine->GetFullUpdate();
+if (fullupdate) {
+    // Precomputed prefixes and their lengths to avoid repeated strlen calls
+    struct FilterPrefix {
+      const char* prefix;
+      size_t length;
+    };
+    static const FilterPrefix filter_prefixes[] = {{"+", 1}};
+    static constexpr size_t num_prefixes = sizeof(filter_prefixes) / sizeof(filter_prefixes[0]);
+    
+    // Cache for fast name lookup (using string_view to avoid copying)
+    static std::unordered_map<std::string, bool> name_prefix_cache;
+    
+    // Reserve memory for exclusion nodes and set
+    const size_t estimated_excluded = deg_graph->id_nodes.size() / 10;
+    std::vector<deg::IDNode*> nodes_to_exclude;
+    nodes_to_exclude.reserve(estimated_excluded);
+    
+    std::unordered_set<const deg::IDNode*> excluded_nodes_set;
+    excluded_nodes_set.reserve(estimated_excluded);
+    
+    // Main filtering loop with optimizations
+    for (deg::IDNode *id_node : deg_graph->id_nodes) {
+      if (!id_node || !id_node->id_orig) {
+        continue;
+      }
+      
+      const char* name = id_node->id_orig->name + 2;
+      
+      // Quick check of the first character before creating a string
+      bool should_exclude = false;
+      
+      // Check prefixes directly without creating a string
+      for (size_t i = 0; i < num_prefixes; ++i) {
+        const FilterPrefix& fp = filter_prefixes[i];
+        if (strncmp(name, fp.prefix, fp.length) == 0) {
+          should_exclude = true;
+          break;
+        }
+      }
+      
+      if (should_exclude) {
+        // Check cache only for objects to exclude
+        std::string name_str(name);
+        auto cache_it = name_prefix_cache.find(name_str);
+        if (cache_it == name_prefix_cache.end()) {
+          name_prefix_cache[name_str] = true;
+        }
+        
+        nodes_to_exclude.push_back(id_node);
+        excluded_nodes_set.insert(id_node);
+      }
+    }
+    
+    // Apply filtering only if there are nodes to exclude
+    if (!nodes_to_exclude.empty()) {
+      // Filtering entry_tags (blender::Set)
+      {
+        std::vector<deg::OperationNode*> nodes_to_remove;
+        for (deg::OperationNode* op_node : deg_graph->entry_tags) {
+          if (op_node->owner && op_node->owner->owner &&
+              excluded_nodes_set.find(op_node->owner->owner) != excluded_nodes_set.end()) {
+            nodes_to_remove.push_back(op_node);
+          }
+        }
+        for (deg::OperationNode* op_node : nodes_to_remove) {
+          deg_graph->entry_tags.remove(op_node);
+        }
+      }
+      
+      // Filtering operations (blender::Vector)
+      {
+        auto& operations = deg_graph->operations;
+        auto new_end = std::remove_if(operations.begin(), operations.end(),
+          [&excluded_nodes_set](deg::OperationNode* op_node) {
+            return op_node->owner && op_node->owner->owner &&
+                   excluded_nodes_set.find(op_node->owner->owner) != excluded_nodes_set.end();
+          });
+        operations.resize(new_end - operations.begin());
+      }
+      
+      // Clear update flags for excluded nodes
+      for (deg::IDNode* id_node : nodes_to_exclude) {
+        for (deg::ComponentNode* comp_node : id_node->components.values()) {
+          if (comp_node) {
+            for (deg::OperationNode* op_node : comp_node->operations) {
+              op_node->flag &= ~deg::DEPSOP_FLAG_NEEDS_UPDATE;
+            }
+          }
+        }
+      }
+    }
+
+
     if (m_collectionRemap) {
       /* check 68589a31ebfb79165f99a979357d237e5413e904 for potential issue or improvement? */
       /* If problem with ReplicateBlenderObject, see other occurences of BKE_collection_object_add_from*/
@@ -757,7 +853,25 @@ void KX_Scene::RenderAfterCameraSetup(KX_Camera *cam,
 
     /* Notify the depsgraph if object transform changed in the scene
     * for next drawing loop. */
+    
+    // Optimization: Create a list of only objects that need transform updates
+    // instead of iterating through all objects in the scene
+    std::vector<KX_GameObject*> transformUpdatedObjects;
+    transformUpdatedObjects.reserve(GetObjectList()->GetCount());
+    // First pass: collect only objects that actually need transform updates
     for (KX_GameObject *gameobj : GetObjectList()) {
+      // Check if the object's transform has actually changed using the SG_Node dirty flag
+      // or if it has special override flags that require processing
+      if (gameobj->GetSGNode()->IsDirty(SG_Node::DIRTY_RENDER) || 
+          (gameobj->GetBlenderObject() && 
+           gameobj->GetBlenderObject()->transflag & OB_TRANSFLAG_OVERRIDE_GAME_PRIORITY)) {
+        transformUpdatedObjects.push_back(gameobj);
+      }
+    }
+    
+    // Second pass: process only objects that need updates
+    // for (KX_GameObject *gameobj : GetObjectList()) {
+    for (KX_GameObject *gameobj : transformUpdatedObjects) {
       /* Update compatibles blender physics simulations */
       Object *ob = gameobj->GetBlenderObject();
       TagBlenderPhysicsObject(scene, ob);
